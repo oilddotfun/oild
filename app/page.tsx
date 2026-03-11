@@ -43,26 +43,7 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
           <p style={{ fontSize: 13, color: "#999", lineHeight: 1.7, margin: "0 0 20px" }}>
             Every country on the world map has its own token! Whether you want to be a token leader or invest in a country token, this is a full-scale battle for nations!
           </p>
-          <p style={{ fontSize: 12, fontWeight: 700, color: "#E8E0D0", margin: "0 0 8px" }}>Buy $OILD Token</p>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10,
-            padding: "10px 14px", marginBottom: 20,
-          }}>
-            <img src="https://cryptologos.cc/logos/solana-sol-logo.png" alt="SOL" style={{ width: 20, height: 20, borderRadius: 999 }} />
-            <span style={{ flex: 1, fontSize: 11, color: "#888", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {TOKEN_CA}
-            </span>
-            <button onClick={() => {
-              navigator.clipboard.writeText(TOKEN_CA);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            }} style={{
-              background: "none", border: "none", cursor: "pointer", padding: 4, color: copied ? "#22C55E" : "#666", fontSize: 14,
-            }}>
-              {copied ? "\u2713" : "\u2398"}
-            </button>
-          </div>
+          <p style={{ fontSize: 13, color: "#888", margin: "0 0 20px" }}>$OILD Token: <span style={{ color: "#D4A017" }}>coming soon...</span></p>
           <p style={{ fontSize: 13, color: "#999", lineHeight: 1.7, margin: "0 0 16px" }}>
             By purchasing the official and primary token of the platform, $OILD, you can help more country tokens join our ecosystem and support the growth of existing ones.
           </p>
