@@ -69,6 +69,12 @@ export async function isClaimed(code: string): Promise<boolean> {
   return claim !== null;
 }
 
+export async function isTokenUsed(tokenAddress: string): Promise<boolean> {
+  await ensureTables();
+  const rows = await sql`SELECT code FROM claims WHERE token_address = ${tokenAddress}`;
+  return rows.length > 0;
+}
+
 export async function updateClaimStats(code: string, population: number, gdp: number): Promise<void> {
   await ensureTables();
   await sql`UPDATE claims SET population = ${population}, gdp = ${gdp} WHERE code = ${code.toUpperCase()}`;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCountry } from "@/lib/countries";
-import { isClaimed, setClaim } from "@/lib/store";
+import { isClaimed, setClaim, isTokenUsed } from "@/lib/store";
 import { verifyTokenExists } from "@/lib/verify-token";
 
 export async function POST(req: Request) {
@@ -23,6 +23,11 @@ export async function POST(req: Request) {
 
     if (!tokenAddress) {
       return NextResponse.json({ error: "Token address required. Deploy on pump.fun first." }, { status: 400 });
+    }
+
+    // Check if this token is already used by another country
+    if (await isTokenUsed(tokenAddress)) {
+      return NextResponse.json({ error: "This token is already attached to another country." }, { status: 409 });
     }
 
     // Validate token address format (Solana base58, 32-88 chars)
