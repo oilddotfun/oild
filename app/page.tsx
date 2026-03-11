@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { feature } from "topojson-client";
 import type { Topology, GeometryCollection } from "topojson-specification";
-import { geoNaturalEarth1, geoPath } from "d3-geo";
+import { geoNaturalEarth1, geoPath, geoMercator, geoCentroid } from "d3-geo";
 import type { GeoPermissibleObjects } from "d3-geo";
 
 /* ══════════════ TYPES ══════════════ */
@@ -73,19 +73,16 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
             <a href="https://pump.fun" target="_blank" rel="noopener noreferrer" style={{
               flex: 1, padding: "12px", borderRadius: 10,
               border: "1px solid rgba(255,255,255,0.1)", background: "transparent",
-              color: "#E8E0D0", fontSize: 12, fontWeight: 700, textAlign: "center",
-              textDecoration: "none",
+              color: "#E8E0D0", fontSize: 12, fontWeight: 700, textAlign: "center", textDecoration: "none",
             }}>$OILD</a>
             <Link href="/leaderboard" style={{
               flex: 1, padding: "12px", borderRadius: 10,
               border: "1px solid rgba(255,255,255,0.1)", background: "transparent",
-              color: "#E8E0D0", fontSize: 12, fontWeight: 700, textAlign: "center",
-              textDecoration: "none",
+              color: "#E8E0D0", fontSize: 12, fontWeight: 700, textAlign: "center", textDecoration: "none",
             }}>How to Use?</Link>
             <button onClick={onClose} style={{
               flex: 1, padding: "12px", borderRadius: 10, border: "none",
-              background: "#D4A017", color: "#0A0A0A",
-              fontSize: 12, fontWeight: 700, cursor: "pointer",
+              background: "#D4A017", color: "#0A0A0A", fontSize: 12, fontWeight: 700, cursor: "pointer",
             }}>I Agree</button>
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 16 }}>
@@ -100,12 +97,155 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+/* ══════════════ COUNTRY POPUP (on-map) ══════════════ */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function CountryPopup({ country, feat, allCountries, onClose }: { country: CountryData; feat: any; allCountries: CountryData[]; onClose: () => void }) {
+  // Generate silhouette using d3-geo
+  const silhouettePath = useMemo(() => {
+    const proj = geoMercator().fitExtent([[4, 4], [96, 96]], feat as GeoPermissibleObjects);
+    const gen = geoPath().projection(proj);
+    return gen(feat as GeoPermissibleObjects) || "";
+  }, [feat]);
+
+  // Calculate rank by oil
+  const rank = allCountries
+    .filter(c => c.oil > 0)
+    .sort((a, b) => b.oil - a.oil)
+    .findIndex(c => c.code === country.code) + 1;
+
+  const oilDisplay = country.oil >= 1000 ? `${(country.oil / 1000).toFixed(1)}B` : `${country.oil}M`;
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 200,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      background: "rgba(0,0,0,0.5)",
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: "#F5F0E8", borderRadius: 16, maxWidth: 340, width: "100%",
+        overflow: "hidden", position: "relative",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+      }}>
+        {/* Close button */}
+        <button onClick={onClose} style={{
+          position: "absolute", top: 12, right: 12, zIndex: 10,
+          width: 28, height: 28, borderRadius: 999, border: "none",
+          background: "#E8943A", color: "white", fontSize: 14, fontWeight: 700,
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+        }}>x</button>
+
+        {/* Silhouette */}
+        <div style={{ padding: "24px 24px 0", display: "flex", justifyContent: "center" }}>
+          <svg width={100} height={100} viewBox="0 0 100 100">
+            <path d={silhouettePath} fill="#E8943A" stroke="#D4820F" strokeWidth={0.8} strokeLinejoin="round" />
+          </svg>
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: "12px 24px 24px" }}>
+          <h3 style={{ fontSize: 22, fontWeight: 800, color: "#1A1A1A", margin: "0 0 8px" }}>{country.name}</h3>
+
+          {!country.claimed ? (
+            <>
+              <p style={{ fontSize: 13, color: "#666", lineHeight: 1.6, margin: "0 0 20px" }}>
+                This country does not yet have a country token and is not governed by anyone. You can be the first to create this country&apos;s token and take control of its future.
+              </p>
+
+              {/* Stats row */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                <div style={{ flex: 1, background: "#EDE8DE", borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+                  <p style={{ fontSize: 10, color: "#999", margin: "0 0 2px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Oil Reserves</p>
+                  <p style={{ fontSize: 16, fontWeight: 800, color: "#1A1A1A", margin: 0 }}>{oilDisplay} bbl</p>
+                </div>
+                <div style={{ flex: 1, background: "#EDE8DE", borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+                  <p style={{ fontSize: 10, color: "#999", margin: "0 0 2px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Global Rank</p>
+                  <p style={{ fontSize: 16, fontWeight: 800, color: "#1A1A1A", margin: 0 }}>#{rank || "--"}</p>
+                </div>
+              </div>
+
+              <Link href={`/country/${country.code}`} style={{
+                display: "block", width: "100%", padding: "14px", borderRadius: 10,
+                border: "1px solid #ccc", background: "transparent",
+                color: "#1A1A1A", fontSize: 13, fontWeight: 700, textAlign: "center",
+                textDecoration: "none", marginBottom: 8,
+              }}>Global Rank</Link>
+
+              <Link href={`/country/${country.code}`} style={{
+                display: "block", width: "100%", padding: "14px", borderRadius: 10,
+                border: "none", background: "#E8943A",
+                color: "white", fontSize: 14, fontWeight: 700, textAlign: "center",
+                textDecoration: "none",
+              }}>Generate Country Token</Link>
+            </>
+          ) : (
+            <>
+              {/* Claimed stats */}
+              <div style={{ display: "flex", gap: 8, margin: "0 0 12px" }}>
+                <div style={{ flex: 1, background: "#EDE8DE", borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+                  <p style={{ fontSize: 10, color: "#999", margin: "0 0 2px", textTransform: "uppercase" }}>Oil Reserves</p>
+                  <p style={{ fontSize: 16, fontWeight: 800, color: "#1A1A1A", margin: 0 }}>{oilDisplay} bbl</p>
+                </div>
+                <div style={{ flex: 1, background: "#EDE8DE", borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+                  <p style={{ fontSize: 10, color: "#999", margin: "0 0 2px", textTransform: "uppercase" }}>Global Rank</p>
+                  <p style={{ fontSize: 16, fontWeight: 800, color: "#1A1A1A", margin: 0 }}>#{rank || "--"}</p>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, margin: "0 0 16px" }}>
+                <div style={{ flex: 1, background: "#EDE8DE", borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+                  <p style={{ fontSize: 10, color: "#999", margin: "0 0 2px", textTransform: "uppercase" }}>Population</p>
+                  <p style={{ fontSize: 16, fontWeight: 800, color: "#1A1A1A", margin: 0 }}>{country.claim?.population?.toLocaleString() || "0"}</p>
+                </div>
+                <div style={{ flex: 1, background: "#EDE8DE", borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+                  <p style={{ fontSize: 10, color: "#999", margin: "0 0 2px", textTransform: "uppercase" }}>GDP</p>
+                  <p style={{ fontSize: 16, fontWeight: 800, color: "#1A1A1A", margin: 0 }}>{country.claim?.gdp ? `$${(country.claim.gdp / 1000).toFixed(0)}K` : "$0"}</p>
+                </div>
+              </div>
+
+              <div style={{ background: "#EDE8DE", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: "#999" }}>President</span>
+                  <span style={{ fontFamily: "monospace", color: "#1A1A1A", fontSize: 11 }}>
+                    {country.claim?.president.slice(0, 6)}...{country.claim?.president.slice(-4)}
+                  </span>
+                </div>
+                {country.claim?.tokenAddress && (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "#999" }}>Token</span>
+                    <a href={`https://pump.fun/coin/${country.claim.tokenAddress}`} target="_blank" rel="noopener noreferrer"
+                      style={{ color: "#E8943A", textDecoration: "none", fontFamily: "monospace", fontSize: 11 }}>
+                      {country.claim.tokenAddress.slice(0, 6)}...{country.claim.tokenAddress.slice(-4)}
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <Link href={`/country/${country.code}`} style={{
+                display: "block", width: "100%", padding: "14px", borderRadius: 10,
+                border: "none", background: "#E8943A",
+                color: "white", fontSize: 14, fontWeight: 700, textAlign: "center",
+                textDecoration: "none", marginBottom: 8,
+              }}>View Nation</Link>
+
+              <Link href={`/country/${country.code}`} style={{
+                display: "block", width: "100%", padding: "14px", borderRadius: 10,
+                border: "1px solid #ccc", background: "transparent",
+                color: "#1A1A1A", fontSize: 13, fontWeight: 700, textAlign: "center",
+                textDecoration: "none",
+              }}>Declare War</Link>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ══════════════ MAIN PAGE ══════════════ */
 
 const MAP_W = 960;
 const MAP_H = 500;
 
-// d3-geo projection — handles antimeridian clipping properly (no cross-map lines)
 const projection = geoNaturalEarth1()
   .scale(160)
   .translate([MAP_W / 2, MAP_H / 2]);
@@ -118,8 +258,8 @@ export default function Home() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [features, setFeatures] = useState<any[]>([]);
   const [hovered, setHovered] = useState<string | null>(null);
-  const [hoveredCountry, setHoveredCountry] = useState<CountryData | null>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [selectedCountry, setSelectedCountry] = useState<{ data: CountryData; feat: any } | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -132,7 +272,7 @@ export default function Home() {
       .then((topo: Topology) => {
         const geojson = feature(topo, topo.objects.countries as GeometryCollection);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const feats = (geojson as any).features.filter((f: any) => f.id !== "010"); // remove Antarctica
+        const feats = (geojson as any).features.filter((f: any) => f.id !== "010");
         setFeatures(feats);
       })
       .catch(err => console.error("Map load error:", err));
@@ -140,17 +280,20 @@ export default function Home() {
 
   const countryByNum = new Map(countries.map(c => [c.numCode, c]));
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (mapRef.current) {
-      const rect = mapRef.current.getBoundingClientRect();
-      setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-    }
-  }, []);
-
   return (
     <div style={{ height: "100vh", background: "#0A0A0A", color: "#E8E0D0", overflow: "hidden" }}>
 
       {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
+
+      {/* Country popup */}
+      {selectedCountry && (
+        <CountryPopup
+          country={selectedCountry.data}
+          feat={selectedCountry.feat}
+          allCountries={countries}
+          onClose={() => setSelectedCountry(null)}
+        />
+      )}
 
       {/* NAV */}
       <nav style={{
@@ -176,7 +319,7 @@ export default function Home() {
       </nav>
 
       {/* MAP */}
-      <section ref={mapRef} onMouseMove={handleMouseMove}
+      <section ref={mapRef}
         style={{ position: "relative", width: "100%", height: "100vh" }}>
         <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid slice"
           style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}>
@@ -188,7 +331,6 @@ export default function Home() {
             const isClaimed = cData?.claimed || false;
             const isHov = hovered === id;
 
-            // Use d3-geo pathGenerator — handles antimeridian, poles, everything
             const d = pathGenerator(f as GeoPermissibleObjects) || "";
             if (!d) return null;
 
@@ -205,67 +347,48 @@ export default function Home() {
                 strokeWidth={isHov ? 1.2 : 0.5}
                 strokeLinejoin="round"
                 style={{ cursor: cData ? "pointer" : "default", transition: "fill 0.12s" }}
-                onMouseEnter={() => { setHovered(id); setHoveredCountry(cData || null); }}
-                onMouseLeave={() => { setHovered(null); setHoveredCountry(null); }}
-                onClick={() => { if (cData) window.location.href = `/country/${cData.code}`; }}
+                onMouseEnter={() => setHovered(id)}
+                onMouseLeave={() => setHovered(null)}
+                onClick={() => {
+                  if (cData) setSelectedCountry({ data: cData, feat: f });
+                }}
               />
             );
           })}
+
+          {/* Country labels */}
+          {features.map((f) => {
+            const id = String(f.id);
+            const cData = countryByNum.get(id);
+            if (!cData) return null;
+            // Only label larger countries (oil > 500 or claimed)
+            if (cData.oil < 500 && !cData.claimed) return null;
+            try {
+              const centroid = projection(geoCentroid(f as GeoPermissibleObjects));
+              if (!centroid) return null;
+              return (
+                <text
+                  key={`label-${id}`}
+                  x={centroid[0]}
+                  y={centroid[1]}
+                  textAnchor="middle"
+                  style={{
+                    fontSize: cData.oil > 50000 ? 7 : 5,
+                    fill: cData.claimed ? "#FBBF24" : "#E8E0D0",
+                    fontWeight: 600,
+                    pointerEvents: "none",
+                    textShadow: "0 0 3px #0A0A0A, 0 0 3px #0A0A0A",
+                  }}
+                >
+                  {cData.name}
+                </text>
+              );
+            } catch {
+              return null;
+            }
+          })}
         </svg>
-
-        {/* Tooltip */}
-        {hoveredCountry && (
-          <div style={{
-            position: "absolute",
-            left: Math.min(mousePos.x + 16, (mapRef.current?.clientWidth || 900) - 260),
-            top: mousePos.y - 10,
-            background: "rgba(10,10,10,0.95)", border: "1px solid rgba(212,160,23,0.25)",
-            borderRadius: 10, padding: "12px 16px", zIndex: 50,
-            pointerEvents: "none", minWidth: 220,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: "#E8E0D0" }}>{hoveredCountry.name}</span>
-              <span style={{
-                fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4,
-                background: hoveredCountry.claimed ? "rgba(34,197,94,0.1)" : "rgba(255,255,255,0.05)",
-                color: hoveredCountry.claimed ? "#22C55E" : "#666",
-              }}>{hoveredCountry.claimed ? "CLAIMED" : "OPEN"}</span>
-            </div>
-            <div style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#666" }}>Oil Reserves</span>
-                <span style={{ fontWeight: 700, color: "#D4A017" }}>
-                  {hoveredCountry.oil >= 1000 ? `${(hoveredCountry.oil / 1000).toFixed(1)}B bbl` : `${hoveredCountry.oil}M bbl`}
-                </span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#666" }}>Region</span>
-                <span style={{ color: "#999" }}>{hoveredCountry.region}</span>
-              </div>
-              {hoveredCountry.claimed && hoveredCountry.claim && (
-                <>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: "#666" }}>President</span>
-                    <span style={{ color: "#E8E0D0", fontFamily: "monospace", fontSize: 11 }}>
-                      {hoveredCountry.claim.president.slice(0, 4)}...{hoveredCountry.claim.president.slice(-4)}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: "#666" }}>Population</span>
-                    <span style={{ color: "#E8E0D0" }}>{hoveredCountry.claim.population.toLocaleString()} holders</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: "#666" }}>GDP</span>
-                    <span style={{ color: "#22C55E" }}>${hoveredCountry.claim.gdp.toLocaleString()}</span>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
       </section>
-
-      </div>
+    </div>
   );
 }
