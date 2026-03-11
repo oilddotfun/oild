@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Country not found" }, { status: 404 });
     }
 
-    if (isClaimed(upper)) {
+    if (await isClaimed(upper)) {
       return NextResponse.json({ error: `${country.name} is already claimed` }, { status: 409 });
     }
 
@@ -24,10 +24,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Token address required. Deploy on pump.fun first." }, { status: 400 });
     }
 
-    // TODO: Verify token on-chain (pump.fun API)
-    // For now, trust the submission and mark as unverified until confirmed
-
-    setClaim(upper, {
+    await setClaim(upper, {
       claimedBy: wallet,
       tokenAddress,
       xCommunity: xCommunity || "",

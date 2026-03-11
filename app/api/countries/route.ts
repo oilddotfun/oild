@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { COUNTRIES } from "@/lib/countries";
-import { getClaim } from "@/lib/store";
+import { getAllClaims } from "@/lib/store";
 
 export async function GET() {
+  const claims = await getAllClaims();
+
   const countries = COUNTRIES.map(c => {
-    const claim = getClaim(c.code);
+    const claim = claims.get(c.code);
     return {
       ...c,
       claimed: !!claim,
