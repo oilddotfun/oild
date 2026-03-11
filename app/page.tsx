@@ -35,12 +35,15 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
         background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16,
         maxWidth: 420, width: "100%", overflow: "hidden",
       }}>
-        <div style={{
-          position: "relative", padding: "28px 24px 20px", textAlign: "center",
-          background: "linear-gradient(180deg, rgba(212,160,23,0.15) 0%, transparent 100%)",
-        }}>
-          <img src="/logo.jpg" alt="OILD" style={{ height: 48, borderRadius: 8, marginBottom: 12 }} />
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: "#E8E0D0", margin: 0 }}>Welcome to OILD.fun!</h2>
+        <div style={{ position: "relative" }}>
+          <img src="/banner.jpg" alt="OILD World Map" style={{ width: "100%", display: "block" }} />
+          <h2 style={{
+            position: "absolute", bottom: 0, left: 0, right: 0,
+            fontSize: 20, fontWeight: 800, color: "#E8E0D0", margin: 0,
+            padding: "40px 24px 16px",
+            background: "linear-gradient(transparent, rgba(17,17,17,1))",
+            textAlign: "center",
+          }}>Welcome to OILD.fun!</h2>
         </div>
         <div style={{ padding: "0 24px 24px" }}>
           <p style={{ fontSize: 13, color: "#999", lineHeight: 1.7, margin: "0 0 20px" }}>
