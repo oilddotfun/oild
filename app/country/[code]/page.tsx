@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import CountryIcon from "@/components/CountryIcon";
 
 interface CountryDetail {
   code: string; numCode: string; name: string; oil: number;
@@ -116,6 +117,9 @@ export default function CountryPage() {
             </div>
           )}
         </div>
+
+        {/* Token icon download */}
+        <CountryIcon numCode={country.numCode} name={country.name} claimed={country.claimed} />
 
         {/* Stats row */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
