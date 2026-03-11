@@ -18,7 +18,6 @@ function decodeTopology(topo: any) {
   const { arcs: rawArcs, transform } = topo;
   const { scale, translate } = transform;
 
-  // Decode quantized arcs to absolute coordinates
   const decodedArcs: number[][][] = rawArcs.map((arc: number[][]) => {
     let px = 0, py = 0;
     return arc.map((delta: number[]) => {
@@ -33,15 +32,16 @@ function decodeTopology(topo: any) {
 
 function decodeRing(indices: number[], decodedArcs: number[][][]): number[][] {
   const coords: number[][] = [];
-  for (const idx of indices) {
+  for (let a = 0; a < indices.length; a++) {
+    const idx = indices[a];
     const forward = idx >= 0;
     const arcIdx = forward ? idx : ~idx;
     const arc = decodedArcs[arcIdx];
-    if (!arc) continue;
+    if (!arc || arc.length === 0) continue;
     const points = forward ? arc : [...arc].reverse();
-    for (let i = 0; i < points.length; i++) {
-      // Skip first point of subsequent arcs (shared with previous arc's last point)
-      if (coords.length > 0 && i === 0) continue;
+    // First arc: include all points. Subsequent arcs: skip first point (shared endpoint).
+    const start = a === 0 ? 0 : 1;
+    for (let i = start; i < points.length; i++) {
       coords.push(points[i]);
     }
   }
@@ -50,60 +50,47 @@ function decodeRing(indices: number[], decodedArcs: number[][][]): number[][] {
 
 /* ══════════════ PROJECTION ══════════════ */
 
-function mercator(lon: number, lat: number, w: number, h: number): [number, number] {
-  const x = ((lon + 180) / 360) * w;
-  const latR = (lat * Math.PI) / 180;
-  // Clamp to avoid infinity near poles
-  const clampedLat = Math.max(-85, Math.min(85, lat));
+const MAP_W = 960;
+const MAP_H = 480;
+// Clamp latitude to avoid Mercator pole issues
+const LAT_MIN = -60;
+const LAT_MAX = 83;
+
+function mercator(lon: number, lat: number): [number, number] {
+  const clampedLat = Math.max(LAT_MIN, Math.min(LAT_MAX, lat));
+  const x = ((lon + 180) / 360) * MAP_W;
   const latRad = (clampedLat * Math.PI) / 180;
-  void latR;
   const mercN = Math.log(Math.tan(Math.PI / 4 + latRad / 2));
-  const y = h / 2 - (w * mercN) / (2 * Math.PI);
+  // Map the mercator Y range for our clamped latitudes
+  const topRad = (LAT_MAX * Math.PI) / 180;
+  const botRad = (LAT_MIN * Math.PI) / 180;
+  const mercTop = Math.log(Math.tan(Math.PI / 4 + topRad / 2));
+  const mercBot = Math.log(Math.tan(Math.PI / 4 + botRad / 2));
+  const y = ((mercTop - mercN) / (mercTop - mercBot)) * MAP_H;
   return [x, y];
 }
 
-function ringToSvg(ring: number[][], w: number, h: number): string {
-  if (ring.length < 2) return "";
+function ringToSvg(ring: number[][]): string {
+  if (ring.length < 3) return "";
   let d = "";
   for (let i = 0; i < ring.length; i++) {
-    const [x, y] = mercator(ring[i][0], ring[i][1], w, h);
-    d += i === 0 ? `M${x.toFixed(2)},${y.toFixed(2)}` : `L${x.toFixed(2)},${y.toFixed(2)}`;
+    const [x, y] = mercator(ring[i][0], ring[i][1]);
+    d += i === 0 ? `M${x.toFixed(1)},${y.toFixed(1)}` : `L${x.toFixed(1)},${y.toFixed(1)}`;
   }
   return d + "Z";
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function geometryToSvg(geom: any, decodedArcs: number[][][], w: number, h: number): string {
+function geometryToSvg(geom: any, decodedArcs: number[][][]): string {
   if (geom.type === "Polygon") {
-    return geom.arcs.map((ring: number[]) => ringToSvg(decodeRing(ring, decodedArcs), w, h)).join("");
+    return geom.arcs.map((ring: number[]) => ringToSvg(decodeRing(ring, decodedArcs))).join("");
   }
   if (geom.type === "MultiPolygon") {
     return geom.arcs.map((poly: number[][]) =>
-      poly.map((ring: number[]) => ringToSvg(decodeRing(ring, decodedArcs), w, h)).join("")
+      poly.map((ring: number[]) => ringToSvg(decodeRing(ring, decodedArcs))).join("")
     ).join("");
   }
   return "";
-}
-
-/* ══════════════ TICKER ══════════════ */
-
-function Ticker({ countries }: { countries: CountryData[] }) {
-  const claimed = countries.filter(c => c.claimed);
-  const text = claimed.length > 0
-    ? claimed.map(c => `${c.name} CLAIMED`).join("  --  ") + "  --  OIL WARS LIVE"
-    : "OIL WARS LIVE  --  Claim a nation. Deploy the token. Become President.  --  Every country. One owner. Forever.";
-
-  return (
-    <div style={{
-      background: "rgba(212,160,23,0.05)", borderBottom: "1px solid rgba(212,160,23,0.12)",
-      padding: "8px 0", overflow: "hidden", whiteSpace: "nowrap", fontSize: 12,
-      fontWeight: 600, color: "#D4A017", letterSpacing: "0.04em",
-    }}>
-      <div style={{ display: "inline-block", animation: "scroll-left 40s linear infinite" }}>
-        {[0, 1, 2].map(i => <span key={i} style={{ padding: "0 60px" }}>{text}</span>)}
-      </div>
-    </div>
-  );
 }
 
 /* ══════════════ MAIN ══════════════ */
@@ -117,8 +104,6 @@ export default function Home() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const mapRef = useRef<HTMLDivElement>(null);
 
-  const W = 960, H = 560;
-
   useEffect(() => {
     fetch("/api/countries").then(r => r.json()).then(d => setCountries(d.countries || [])).catch(() => {});
   }, []);
@@ -126,7 +111,12 @@ export default function Home() {
   useEffect(() => {
     fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
       .then(r => r.json())
-      .then(topo => setMapData(decodeTopology(topo)))
+      .then(topo => {
+        const data = decodeTopology(topo);
+        // Filter out Antarctica (numeric code 010)
+        data.geometries = data.geometries.filter((g: { id: string }) => g.id !== "010");
+        setMapData(data);
+      })
       .catch(err => console.error("Map load failed:", err));
   }, []);
 
@@ -142,14 +132,14 @@ export default function Home() {
   return (
     <div style={{ minHeight: "100vh", background: "#0A0A0A", color: "#E8E0D0" }}>
 
-      {/* ── NAV (oval pill) ── */}
+      {/* ── NAV (oval pill, floats over map) ── */}
       <nav style={{
         position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 100,
-        background: "rgba(20,20,20,0.9)", backdropFilter: "blur(16px)",
+        background: "rgba(20,20,20,0.85)", backdropFilter: "blur(16px)",
         border: "1px solid rgba(255,255,255,0.08)", borderRadius: 999,
         padding: "0 32px", height: 48,
         display: "flex", alignItems: "center", gap: 24,
-        boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
       }}>
         <Link href="/" style={{ fontSize: 16, fontWeight: 800, color: "#D4A017", textDecoration: "none", letterSpacing: "0.06em" }}>OILD</Link>
         <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
@@ -163,42 +153,24 @@ export default function Home() {
         </button>
       </nav>
 
-      {/* ── TICKER ── */}
-      <div style={{ paddingTop: 80 }}>
-        <Ticker countries={countries} />
-      </div>
-
-      {/* ── FULL-SCREEN MAP ── */}
+      {/* ── FULL-SCREEN MAP (starts at very top of page) ── */}
       <section ref={mapRef} onMouseMove={handleMouseMove}
-        style={{ position: "relative", width: "100%", padding: "0", overflow: "hidden" }}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
-          <rect width={W} height={H} fill="#0A0A0A" />
+        style={{ position: "relative", width: "100%", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid slice"
+          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}>
+          <rect width={MAP_W} height={MAP_H} fill="#0A0A0A" />
 
-          {/* Grid lines (faint) */}
-          {Array.from({ length: 7 }, (_, i) => {
-            const lon = -180 + (i + 1) * (360 / 8);
-            const [x] = mercator(lon, 0, W, H);
-            return <line key={`vl${i}`} x1={x} y1={0} x2={x} y2={H} stroke="rgba(255,255,255,0.03)" strokeWidth={0.5} />;
-          })}
-          {Array.from({ length: 5 }, (_, i) => {
-            const lat = -60 + i * 30;
-            const [, y] = mercator(0, lat, W, H);
-            return <line key={`hl${i}`} x1={0} y1={y} x2={W} y2={y} stroke="rgba(255,255,255,0.03)" strokeWidth={0.5} />;
-          })}
-
-          {/* Country paths */}
+          {/* Country paths — NO grid lines */}
           {mapData && mapData.geometries.map((geom) => {
             const id = geom.id;
             const cData = countryByNum.get(id);
             const isClaimed = cData?.claimed || false;
             const isHovered = hovered === id;
-            const path = geometryToSvg(geom, mapData.decodedArcs, W, H);
+            const path = geometryToSvg(geom, mapData.decodedArcs);
             if (!path) return null;
 
-            let fill = "#3D3A33"; // default — dark muted for countries without data
-            if (cData) {
-              fill = isClaimed ? "#D4A017" : "#B8A88A"; // gold if claimed, tan if in our list
-            }
+            let fill = "#3D3A33";
+            if (cData) fill = isClaimed ? "#D4A017" : "#B8A88A";
             if (isHovered) fill = isClaimed ? "#F59E0B" : "#C4A882";
 
             return (
@@ -207,7 +179,8 @@ export default function Home() {
                 d={path}
                 fill={fill}
                 stroke="#1A1A18"
-                strokeWidth={isHovered ? 1 : 0.4}
+                strokeWidth={isHovered ? 0.8 : 0.3}
+                strokeLinejoin="round"
                 style={{ cursor: cData ? "pointer" : "default", transition: "fill 0.12s" }}
                 onMouseEnter={() => { setHovered(id); setHoveredCountry(cData || null); }}
                 onMouseLeave={() => { setHovered(null); setHoveredCountry(null); }}
@@ -220,7 +193,9 @@ export default function Home() {
         {/* Tooltip */}
         {hoveredCountry && (
           <div style={{
-            position: "absolute", left: Math.min(mousePos.x + 16, (mapRef.current?.clientWidth || 900) - 260), top: mousePos.y - 10,
+            position: "absolute",
+            left: Math.min(mousePos.x + 16, (mapRef.current?.clientWidth || 900) - 260),
+            top: mousePos.y - 10,
             background: "rgba(10,10,10,0.95)", border: "1px solid rgba(212,160,23,0.25)",
             borderRadius: 10, padding: "12px 16px", zIndex: 50,
             pointerEvents: "none", minWidth: 220,
@@ -281,17 +256,18 @@ export default function Home() {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
           {[
-            { n: "01", title: "Claim a Nation", desc: "Choose an unclaimed country. Deploy its national token on pump.fun with the supplied info (name, ticker, image). Submit the token address to claim it. You become President." },
-            { n: "02", title: "Build Population", desc: "Your nation's population is the token's total holder count. More holders = bigger army. Rally your community on X to grow your nation." },
-            { n: "03", title: "Grow Your GDP", desc: "Your GDP is your token's market cap. Higher market cap = more powerful economy. Fund your war chest." },
-            { n: "04", title: "Declare War", desc: "Attack other nations to steal their oil reserves. Wars are decided by your army size (holders) vs theirs. Bigger population wins. The loser has oil barrels transferred to the winner." },
-            { n: "05", title: "Dominate", desc: "Climb the leaderboard. Control the global oil supply. The nation with the most oil at the end of each epoch wins rewards." },
+            { n: "01", icon: "\u{1F3F4}", title: "Claim a Nation", desc: "Choose an unclaimed country. Deploy its national token on pump.fun with the supplied info (name, ticker, image). Submit the token address to claim it. You become President." },
+            { n: "02", icon: "\u{1F465}", title: "Build Population", desc: "Your nation's population is the token's total holder count. More holders = bigger army. Rally your community on X to grow your nation." },
+            { n: "03", icon: "\u{1F4B0}", title: "Grow Your GDP", desc: "Your GDP is your token's market cap. Higher market cap = more powerful economy. Fund your war chest." },
+            { n: "04", icon: "\u{2694}\u{FE0F}", title: "Declare War", desc: "Attack other nations to steal their oil reserves. Wars are decided by army size (holders) vs theirs. Bigger population wins. Loser's oil transfers to winner." },
+            { n: "05", icon: "\u{1F3C6}", title: "Dominate", desc: "Climb the leaderboard. Control the global oil supply. The nation with the most oil at the end of each epoch wins rewards." },
           ].map(s => (
             <div key={s.n} style={{
               background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
               borderRadius: 10, padding: 20,
             }}>
-              <span style={{ fontSize: 11, fontWeight: 800, color: "#D4A017", display: "block", marginBottom: 8 }}>{s.n}</span>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>{s.icon}</div>
+              <span style={{ fontSize: 10, fontWeight: 800, color: "#D4A017", display: "block", marginBottom: 4 }}>STEP {s.n}</span>
               <p style={{ fontSize: 13, fontWeight: 700, color: "#E8E0D0", margin: "0 0 6px" }}>{s.title}</p>
               <p style={{ fontSize: 12, color: "#666", lineHeight: 1.6, margin: 0 }}>{s.desc}</p>
             </div>
