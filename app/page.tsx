@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { feature } from "topojson-client";
 import type { Topology, GeometryCollection } from "topojson-specification";
+import { geoNaturalEarth1, geoPath } from "d3-geo";
+import type { GeoPermissibleObjects } from "d3-geo";
 
 /* ══════════════ TYPES ══════════════ */
 
@@ -11,59 +13,6 @@ interface CountryData {
   code: string; numCode: string; name: string; oil: number;
   region: string; claimed: boolean;
   claim: { president: string; tokenAddress: string; population: number; gdp: number } | null;
-}
-
-interface GeoFeature {
-  type: string;
-  id: string;
-  properties: Record<string, unknown>;
-  geometry: {
-    type: string;
-    coordinates: number[][][] | number[][][][];
-  };
-}
-
-/* ══════════════ PROJECTION (Mercator, clamped) ══════════════ */
-
-const MAP_W = 960;
-const MAP_H = 500;
-const LAT_MAX = 83.5;
-const LAT_MIN = -56;
-
-function toMerc(lon: number, lat: number): [number, number] {
-  const cLat = Math.max(LAT_MIN, Math.min(LAT_MAX, lat));
-  const x = ((lon + 180) / 360) * MAP_W;
-  const rad = (cLat * Math.PI) / 180;
-  const topRad = (LAT_MAX * Math.PI) / 180;
-  const botRad = (LAT_MIN * Math.PI) / 180;
-  const mercY = Math.log(Math.tan(Math.PI / 4 + rad / 2));
-  const mercTop = Math.log(Math.tan(Math.PI / 4 + topRad / 2));
-  const mercBot = Math.log(Math.tan(Math.PI / 4 + botRad / 2));
-  const y = ((mercTop - mercY) / (mercTop - mercBot)) * MAP_H;
-  return [x, y];
-}
-
-function ringToPath(coords: number[][]): string {
-  if (coords.length < 3) return "";
-  const parts: string[] = [];
-  for (let i = 0; i < coords.length; i++) {
-    const [x, y] = toMerc(coords[i][0], coords[i][1]);
-    parts.push(`${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
-  }
-  return parts.join("") + "Z";
-}
-
-function featureToPath(f: GeoFeature): string {
-  const g = f.geometry;
-  if (g.type === "Polygon") {
-    return (g.coordinates as number[][][]).map(ring => ringToPath(ring)).join("");
-  }
-  if (g.type === "MultiPolygon") {
-    return (g.coordinates as number[][][][])
-      .map(poly => poly.map(ring => ringToPath(ring)).join(""))
-      .join("");
-  }
-  return "";
 }
 
 /* ══════════════ WELCOME MODAL ══════════════ */
@@ -83,7 +32,6 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
         background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16,
         maxWidth: 420, width: "100%", overflow: "hidden",
       }}>
-        {/* Header */}
         <div style={{
           position: "relative", padding: "28px 24px 20px", textAlign: "center",
           background: "linear-gradient(180deg, rgba(212,160,23,0.15) 0%, transparent 100%)",
@@ -91,12 +39,10 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
           <img src="/logo.jpg" alt="OILD" style={{ height: 48, borderRadius: 8, marginBottom: 12 }} />
           <h2 style={{ fontSize: 22, fontWeight: 800, color: "#E8E0D0", margin: 0 }}>Welcome to OILD.fun!</h2>
         </div>
-
         <div style={{ padding: "0 24px 24px" }}>
           <p style={{ fontSize: 13, color: "#999", lineHeight: 1.7, margin: "0 0 20px" }}>
             Every country on the world map has its own token! Whether you want to be a token leader or invest in a country token, this is a full-scale battle for nations!
           </p>
-
           <p style={{ fontSize: 12, fontWeight: 700, color: "#E8E0D0", margin: "0 0 8px" }}>Buy $OILD Token</p>
           <div style={{
             display: "flex", alignItems: "center", gap: 8,
@@ -117,15 +63,12 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
               {copied ? "\u2713" : "\u2398"}
             </button>
           </div>
-
           <p style={{ fontSize: 13, color: "#999", lineHeight: 1.7, margin: "0 0 16px" }}>
             By purchasing the official and primary token of the platform, $OILD, you can help more country tokens join our ecosystem and support the growth of existing ones.
           </p>
-
           <p style={{ fontSize: 11, color: "#666", lineHeight: 1.6, margin: "0 0 20px" }}>
             <strong style={{ color: "#999" }}>Please note:</strong> The country tokens on this platform have no affiliation with real-world countries and are created purely for entertainment purposes. Remember, each token is created by other visitors like you, so always invest responsibly.
           </p>
-
           <div style={{ display: "flex", gap: 8 }}>
             <a href="https://pump.fun" target="_blank" rel="noopener noreferrer" style={{
               flex: 1, padding: "12px", borderRadius: 10,
@@ -145,7 +88,6 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
               fontSize: 12, fontWeight: 700, cursor: "pointer",
             }}>I Agree</button>
           </div>
-
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 16 }}>
             <a href="https://x.com" target="_blank" rel="noopener noreferrer" style={{ color: "#555" }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
@@ -160,29 +102,37 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
 
 /* ══════════════ MAIN PAGE ══════════════ */
 
+const MAP_W = 960;
+const MAP_H = 500;
+
+// d3-geo projection — handles antimeridian clipping properly (no cross-map lines)
+const projection = geoNaturalEarth1()
+  .scale(160)
+  .translate([MAP_W / 2, MAP_H / 2]);
+
+const pathGenerator = geoPath().projection(projection);
+
 export default function Home() {
   const [countries, setCountries] = useState<CountryData[]>([]);
   const [showWelcome, setShowWelcome] = useState(true);
-  const [features, setFeatures] = useState<GeoFeature[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [features, setFeatures] = useState<any[]>([]);
   const [hovered, setHovered] = useState<string | null>(null);
   const [hoveredCountry, setHoveredCountry] = useState<CountryData | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const mapRef = useRef<HTMLDivElement>(null);
 
-  // Load country data from API
   useEffect(() => {
     fetch("/api/countries").then(r => r.json()).then(d => setCountries(d.countries || [])).catch(() => {});
   }, []);
 
-  // Load TopoJSON and convert properly using topojson-client
   useEffect(() => {
     fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
       .then(r => r.json())
       .then((topo: Topology) => {
         const geojson = feature(topo, topo.objects.countries as GeometryCollection);
-        const feats = (geojson as unknown as { features: GeoFeature[] }).features
-          // Filter out Antarctica
-          .filter((f: GeoFeature) => f.id !== "010");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const feats = (geojson as any).features.filter((f: any) => f.id !== "010"); // remove Antarctica
         setFeatures(feats);
       })
       .catch(err => console.error("Map load error:", err));
@@ -200,10 +150,9 @@ export default function Home() {
   return (
     <div style={{ height: "100vh", background: "#0A0A0A", color: "#E8E0D0", overflow: "hidden" }}>
 
-      {/* WELCOME MODAL */}
       {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
 
-      {/* NAV — oval pill, floats over map */}
+      {/* NAV */}
       <nav style={{
         position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 100,
         background: "rgba(20,20,20,0.85)", backdropFilter: "blur(16px)",
@@ -226,20 +175,22 @@ export default function Home() {
         </Link>
       </nav>
 
-      {/* MAP — fullscreen, IS the page */}
+      {/* MAP */}
       <section ref={mapRef} onMouseMove={handleMouseMove}
         style={{ position: "relative", width: "100%", height: "100vh" }}>
         <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid slice"
           style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}>
           <rect width={MAP_W} height={MAP_H} fill="#0A0A0A" />
 
-          {features.map(f => {
+          {features.map((f) => {
             const id = String(f.id);
             const cData = countryByNum.get(id);
             const isClaimed = cData?.claimed || false;
             const isHov = hovered === id;
-            const path = featureToPath(f);
-            if (!path) return null;
+
+            // Use d3-geo pathGenerator — handles antimeridian, poles, everything
+            const d = pathGenerator(f as GeoPermissibleObjects) || "";
+            if (!d) return null;
 
             let fill = "#3D3A33";
             if (cData) fill = isClaimed ? "#F59E0B" : "#E8943A";
@@ -248,10 +199,10 @@ export default function Home() {
             return (
               <path
                 key={id}
-                d={path}
+                d={d}
                 fill={fill}
-                stroke="#1A1A18"
-                strokeWidth={isHov ? 0.8 : 0.3}
+                stroke="#0A0A0A"
+                strokeWidth={isHov ? 1.2 : 0.5}
                 strokeLinejoin="round"
                 style={{ cursor: cData ? "pointer" : "default", transition: "fill 0.12s" }}
                 onMouseEnter={() => { setHovered(id); setHoveredCountry(cData || null); }}
@@ -315,7 +266,6 @@ export default function Home() {
         )}
       </section>
 
-      
-    </div>
+      </div>
   );
 }
