@@ -119,7 +119,6 @@ export default function Home() {
         <Link href="/" style={{ fontSize: 16, fontWeight: 800, color: "#D4A017", textDecoration: "none", letterSpacing: "0.06em" }}>OILD</Link>
         <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
         <a href="#how" style={{ fontSize: 12, color: "#888", textDecoration: "none", fontWeight: 500 }}>How it Works</a>
-        <Link href="/leaderboard" style={{ fontSize: 12, color: "#888", textDecoration: "none", fontWeight: 500 }}>Leaderboard</Link>
         <Link href="/leaderboard" style={{
           padding: "7px 18px", borderRadius: 999, border: "none", display: "inline-block",
           background: "#D4A017", color: "#0A0A0A", fontSize: 11, fontWeight: 700, cursor: "pointer",
