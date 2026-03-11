@@ -241,6 +241,10 @@ export default function Home() {
   const [hovered, setHovered] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedCountry, setSelectedCountry] = useState<{ data: CountryData; feat: any } | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -260,6 +264,29 @@ export default function Home() {
   }, []);
 
   const countryByNum = new Map(countries.map(c => [c.numCode, c]));
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    setZoom(z => Math.max(1, Math.min(8, z * delta)));
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button === 0 && zoom > 1) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    }
+  }, [zoom, pan]);
+
+  const handleMouseMoveMap = useCallback((e: React.MouseEvent) => {
+    if (isPanning) {
+      setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+    }
+  }, [isPanning, panStart]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+  }, []);
 
   return (
     <div style={{ height: "100vh", background: "#0A0A0A", color: "#E8E0D0", overflow: "hidden" }}>
@@ -301,9 +328,19 @@ export default function Home() {
 
       {/* MAP */}
       <section ref={mapRef}
-        style={{ position: "relative", width: "100%", height: "100vh" }}>
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMoveMap}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        style={{ position: "relative", width: "100%", height: "100vh", cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default" }}>
         <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid slice"
-          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}>
+          style={{
+            position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+            transformOrigin: "center center",
+            transition: isPanning ? "none" : "transform 0.15s ease-out",
+          }}>
           <rect width={MAP_W} height={MAP_H} fill="#0A0A0A" />
 
           {features.map((f) => {
@@ -393,6 +430,18 @@ export default function Home() {
             }
           })}
         </svg>
+
+        {/* Zoom controls */}
+        {zoom > 1 && (
+          <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} style={{
+            position: "absolute", bottom: 20, right: 20, zIndex: 50,
+            padding: "8px 16px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.1)",
+            background: "rgba(20,20,20,0.9)", color: "#888", fontSize: 11, fontWeight: 600,
+            cursor: "pointer", backdropFilter: "blur(8px)",
+          }}>
+            Reset Zoom ({zoom.toFixed(1)}x)
+          </button>
+        )}
       </section>
     </div>
   );
