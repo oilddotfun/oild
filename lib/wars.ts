@@ -18,7 +18,7 @@ export interface War {
 }
 
 const WAR_DURATION_MS = 10 * 60 * 1000;
-const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const OIL_STEAL_PERCENT = 0.05;
 export const WAR_COST_SOL = 1;
 export const MISSILE_VOLUME = 100_000;
@@ -98,6 +98,12 @@ export async function declareWar(
   const aCode = attackerCode.toUpperCase();
   const dCode = defenderCode.toUpperCase();
 
+  // Only 1 war at a time globally
+  const currentActive = await getActiveWars();
+  if (currentActive.length > 0) {
+    return { success: false, error: "There is already an active war. Wait for it to end before declaring another." };
+  }
+
   if (await isOnCooldown(dCode)) {
     const exp = await getCooldownExpiry(dCode);
     const mins = exp ? Math.ceil((exp - Date.now()) / 60000) : 0;
@@ -159,7 +165,7 @@ export async function resolveWar(warId: string, attackerVolume: number, defender
     WHERE id = ${warId}
   `;
 
-  // Set 24hr cooldown on loser
+  // Set 1hr cooldown on loser
   const cooldownExpiry = Date.now() + COOLDOWN_MS;
   await sql`
     INSERT INTO cooldowns (code, expires_at) VALUES (${loser}, ${cooldownExpiry})

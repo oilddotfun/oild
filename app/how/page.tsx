@@ -85,8 +85,8 @@ export default function HowItWorks() {
                   <p style={{ fontSize: 12, color: "#666", margin: 0 }}>The losing nation has 5% of their oil reserves permanently transferred to the winner. Oil is power — lose enough wars and your nation dries up.</p>
                 </div>
                 <div>
-                  <p style={{ fontSize: 12, fontWeight: 700, color: "#888", margin: "0 0 4px" }}>24hr Cooldown</p>
-                  <p style={{ fontSize: 12, color: "#666", margin: 0 }}>After being attacked, a nation has a 24-hour shield. They can&apos;t be raided again during this period. Plan your attacks wisely.</p>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: "#888", margin: "0 0 4px" }}>1hr cooldown</p>
+                  <p style={{ fontSize: 12, color: "#666", margin: 0 }}>After being attacked, a nation has a 1-hour shield. They can&apos;t be raided again during this period. Plan your attacks wisely.</p>
                 </div>
               </div>
             </div>
