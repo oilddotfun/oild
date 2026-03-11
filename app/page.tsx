@@ -105,7 +105,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0A0A0A", color: "#E8E0D0" }}>
+    <div style={{ height: "100vh", background: "#0A0A0A", color: "#E8E0D0", overflow: "hidden" }}>
 
       {/* NAV — oval pill, floats over map */}
       <nav style={{
@@ -128,9 +128,9 @@ export default function Home() {
         </Link>
       </nav>
 
-      {/* MAP — fullscreen, starts at top */}
+      {/* MAP — fullscreen, IS the page */}
       <section ref={mapRef} onMouseMove={handleMouseMove}
-        style={{ position: "relative", width: "100%", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        style={{ position: "relative", width: "100%", height: "100vh" }}>
         <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid slice"
           style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}>
           <rect width={MAP_W} height={MAP_H} fill="#0A0A0A" />
@@ -144,8 +144,8 @@ export default function Home() {
             if (!path) return null;
 
             let fill = "#3D3A33";
-            if (cData) fill = isClaimed ? "#D4A017" : "#B8A88A";
-            if (isHov) fill = isClaimed ? "#F59E0B" : "#D4C4A0";
+            if (cData) fill = isClaimed ? "#F59E0B" : "#E8943A";
+            if (isHov) fill = isClaimed ? "#FBBF24" : "#F0A94E";
 
             return (
               <path
@@ -217,40 +217,7 @@ export default function Home() {
         )}
       </section>
 
-      {/* HOW IT WORKS */}
-      <section id="how" style={{
-        maxWidth: 900, margin: "0 auto", padding: "60px 24px 80px", scrollMarginTop: 80,
-      }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: "#E8E0D0", textAlign: "center", marginBottom: 8 }}>
-          How It Works
-        </h2>
-        <p style={{ fontSize: 13, color: "#666", textAlign: "center", marginBottom: 40 }}>
-          Claim nations. Build armies. Wage oil wars.
-        </p>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-          {[
-            { n: "01", title: "Claim a Nation", desc: "Choose an unclaimed country. Deploy its national token on pump.fun with the supplied info (name, ticker, image). Submit the token address to claim it. You become President." },
-            { n: "02", title: "Build Population", desc: "Your nation\u2019s population is the token\u2019s total holder count. More holders = bigger army. Rally your community on X to grow your nation." },
-            { n: "03", title: "Grow Your GDP", desc: "Your GDP is your token\u2019s market cap. Higher market cap = more powerful economy. Fund your war chest." },
-            { n: "04", title: "Declare War", desc: "Attack other nations to steal their oil reserves. Wars are decided by army size (holders) vs theirs. Bigger population wins. Loser\u2019s oil transfers to winner." },
-            { n: "05", title: "Dominate", desc: "Climb the leaderboard. Control the global oil supply. The nation with the most oil at the end of each epoch wins rewards." },
-          ].map(s => (
-            <div key={s.n} style={{
-              background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
-              borderRadius: 10, padding: 20,
-            }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: "#D4A017", display: "block", marginBottom: 6 }}>STEP {s.n}</span>
-              <p style={{ fontSize: 13, fontWeight: 700, color: "#E8E0D0", margin: "0 0 6px" }}>{s.title}</p>
-              <p style={{ fontSize: 12, color: "#666", lineHeight: 1.6, margin: 0 }}>{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <footer style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "20px", textAlign: "center" }}>
-        <p style={{ fontSize: 11, color: "#444" }}>OILD.fun -- The on-chain oil war. Built on Solana.</p>
-      </footer>
+      
     </div>
   );
 }
