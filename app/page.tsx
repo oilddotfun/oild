@@ -116,7 +116,9 @@ export default function Home() {
         display: "flex", alignItems: "center", gap: 24,
         boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
       }}>
-        <Link href="/" style={{ fontSize: 16, fontWeight: 800, color: "#D4A017", textDecoration: "none", letterSpacing: "0.06em" }}>OILD</Link>
+        <Link href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+          <img src="/logo.jpg" alt="OILD" style={{ height: 28, borderRadius: 4 }} />
+        </Link>
         <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
         <a href="#how" style={{ fontSize: 12, color: "#888", textDecoration: "none", fontWeight: 500 }}>How it Works</a>
         <Link href="/leaderboard" style={{

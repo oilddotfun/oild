@@ -7,7 +7,10 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 export const metadata: Metadata = {
   title: "OILD.fun | Claim Nations. Drill Oil. Conquer the Map.",
   description: "The on-chain oil war. Claim countries, drill for oil, raid enemies. Built on Solana.",
-  icons: { icon: "/favicon.ico" },
+  icons: {
+    icon: "/logo.jpg",
+    apple: "/logo.jpg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
