@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { feature } from "topojson-client";
+import type { Topology, GeometryCollection } from "topojson-specification";
 
 /* ══════════════ TYPES ══════════════ */
 
@@ -11,113 +13,86 @@ interface CountryData {
   claim: { president: string; tokenAddress: string; population: number; gdp: number } | null;
 }
 
-/* ══════════════ TOPOJSON DECODER ══════════════ */
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function decodeTopology(topo: any) {
-  const { arcs: rawArcs, transform } = topo;
-  const { scale, translate } = transform;
-
-  const decodedArcs: number[][][] = rawArcs.map((arc: number[][]) => {
-    let px = 0, py = 0;
-    return arc.map((delta: number[]) => {
-      px += delta[0];
-      py += delta[1];
-      return [px * scale[0] + translate[0], py * scale[1] + translate[1]];
-    });
-  });
-
-  return { decodedArcs, geometries: topo.objects.countries.geometries };
+interface GeoFeature {
+  type: string;
+  id: string;
+  properties: Record<string, unknown>;
+  geometry: {
+    type: string;
+    coordinates: number[][][] | number[][][][];
+  };
 }
 
-function decodeRing(indices: number[], decodedArcs: number[][][]): number[][] {
-  const coords: number[][] = [];
-  for (let a = 0; a < indices.length; a++) {
-    const idx = indices[a];
-    const forward = idx >= 0;
-    const arcIdx = forward ? idx : ~idx;
-    const arc = decodedArcs[arcIdx];
-    if (!arc || arc.length === 0) continue;
-    const points = forward ? arc : [...arc].reverse();
-    // First arc: include all points. Subsequent arcs: skip first point (shared endpoint).
-    const start = a === 0 ? 0 : 1;
-    for (let i = start; i < points.length; i++) {
-      coords.push(points[i]);
-    }
-  }
-  return coords;
-}
-
-/* ══════════════ PROJECTION ══════════════ */
+/* ══════════════ PROJECTION (Mercator, clamped) ══════════════ */
 
 const MAP_W = 960;
-const MAP_H = 480;
-// Clamp latitude to avoid Mercator pole issues
-const LAT_MIN = -60;
-const LAT_MAX = 83;
+const MAP_H = 500;
+const LAT_MAX = 83.5;
+const LAT_MIN = -56;
 
-function mercator(lon: number, lat: number): [number, number] {
-  const clampedLat = Math.max(LAT_MIN, Math.min(LAT_MAX, lat));
+function toMerc(lon: number, lat: number): [number, number] {
+  const cLat = Math.max(LAT_MIN, Math.min(LAT_MAX, lat));
   const x = ((lon + 180) / 360) * MAP_W;
-  const latRad = (clampedLat * Math.PI) / 180;
-  const mercN = Math.log(Math.tan(Math.PI / 4 + latRad / 2));
-  // Map the mercator Y range for our clamped latitudes
+  const rad = (cLat * Math.PI) / 180;
   const topRad = (LAT_MAX * Math.PI) / 180;
   const botRad = (LAT_MIN * Math.PI) / 180;
+  const mercY = Math.log(Math.tan(Math.PI / 4 + rad / 2));
   const mercTop = Math.log(Math.tan(Math.PI / 4 + topRad / 2));
   const mercBot = Math.log(Math.tan(Math.PI / 4 + botRad / 2));
-  const y = ((mercTop - mercN) / (mercTop - mercBot)) * MAP_H;
+  const y = ((mercTop - mercY) / (mercTop - mercBot)) * MAP_H;
   return [x, y];
 }
 
-function ringToSvg(ring: number[][]): string {
-  if (ring.length < 3) return "";
-  let d = "";
-  for (let i = 0; i < ring.length; i++) {
-    const [x, y] = mercator(ring[i][0], ring[i][1]);
-    d += i === 0 ? `M${x.toFixed(1)},${y.toFixed(1)}` : `L${x.toFixed(1)},${y.toFixed(1)}`;
+function ringToPath(coords: number[][]): string {
+  if (coords.length < 3) return "";
+  const parts: string[] = [];
+  for (let i = 0; i < coords.length; i++) {
+    const [x, y] = toMerc(coords[i][0], coords[i][1]);
+    parts.push(`${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
   }
-  return d + "Z";
+  return parts.join("") + "Z";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function geometryToSvg(geom: any, decodedArcs: number[][][]): string {
-  if (geom.type === "Polygon") {
-    return geom.arcs.map((ring: number[]) => ringToSvg(decodeRing(ring, decodedArcs))).join("");
+function featureToPath(f: GeoFeature): string {
+  const g = f.geometry;
+  if (g.type === "Polygon") {
+    return (g.coordinates as number[][][]).map(ring => ringToPath(ring)).join("");
   }
-  if (geom.type === "MultiPolygon") {
-    return geom.arcs.map((poly: number[][]) =>
-      poly.map((ring: number[]) => ringToSvg(decodeRing(ring, decodedArcs))).join("")
-    ).join("");
+  if (g.type === "MultiPolygon") {
+    return (g.coordinates as number[][][][])
+      .map(poly => poly.map(ring => ringToPath(ring)).join(""))
+      .join("");
   }
   return "";
 }
 
-/* ══════════════ MAIN ══════════════ */
+/* ══════════════ MAIN PAGE ══════════════ */
 
 export default function Home() {
   const [countries, setCountries] = useState<CountryData[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [mapData, setMapData] = useState<{ decodedArcs: number[][][]; geometries: any[] } | null>(null);
+  const [features, setFeatures] = useState<GeoFeature[]>([]);
   const [hovered, setHovered] = useState<string | null>(null);
   const [hoveredCountry, setHoveredCountry] = useState<CountryData | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const mapRef = useRef<HTMLDivElement>(null);
 
+  // Load country data from API
   useEffect(() => {
     fetch("/api/countries").then(r => r.json()).then(d => setCountries(d.countries || [])).catch(() => {});
   }, []);
 
+  // Load TopoJSON and convert properly using topojson-client
   useEffect(() => {
     fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
       .then(r => r.json())
-      .then(topo => {
-        const data = decodeTopology(topo);
-        // Filter out Antarctica (numeric code 010)
-        data.geometries = data.geometries.filter((g: { id: string }) => g.id !== "010");
-        setMapData(data);
+      .then((topo: Topology) => {
+        const geojson = feature(topo, topo.objects.countries as GeometryCollection);
+        const feats = (geojson as unknown as { features: GeoFeature[] }).features
+          // Filter out Antarctica
+          .filter((f: GeoFeature) => f.id !== "010");
+        setFeatures(feats);
       })
-      .catch(err => console.error("Map load failed:", err));
+      .catch(err => console.error("Map load error:", err));
   }, []);
 
   const countryByNum = new Map(countries.map(c => [c.numCode, c]));
@@ -132,7 +107,7 @@ export default function Home() {
   return (
     <div style={{ minHeight: "100vh", background: "#0A0A0A", color: "#E8E0D0" }}>
 
-      {/* ── NAV (oval pill, floats over map) ── */}
+      {/* NAV — oval pill, floats over map */}
       <nav style={{
         position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 100,
         background: "rgba(20,20,20,0.85)", backdropFilter: "blur(16px)",
@@ -154,25 +129,24 @@ export default function Home() {
         </Link>
       </nav>
 
-      {/* ── FULL-SCREEN MAP (starts at very top of page) ── */}
+      {/* MAP — fullscreen, starts at top */}
       <section ref={mapRef} onMouseMove={handleMouseMove}
-        style={{ position: "relative", width: "100%", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        style={{ position: "relative", width: "100%", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid slice"
           style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}>
           <rect width={MAP_W} height={MAP_H} fill="#0A0A0A" />
 
-          {/* Country paths — NO grid lines */}
-          {mapData && mapData.geometries.map((geom) => {
-            const id = geom.id;
+          {features.map(f => {
+            const id = String(f.id);
             const cData = countryByNum.get(id);
             const isClaimed = cData?.claimed || false;
-            const isHovered = hovered === id;
-            const path = geometryToSvg(geom, mapData.decodedArcs);
+            const isHov = hovered === id;
+            const path = featureToPath(f);
             if (!path) return null;
 
             let fill = "#3D3A33";
             if (cData) fill = isClaimed ? "#D4A017" : "#B8A88A";
-            if (isHovered) fill = isClaimed ? "#F59E0B" : "#C4A882";
+            if (isHov) fill = isClaimed ? "#F59E0B" : "#D4C4A0";
 
             return (
               <path
@@ -180,7 +154,7 @@ export default function Home() {
                 d={path}
                 fill={fill}
                 stroke="#1A1A18"
-                strokeWidth={isHovered ? 0.8 : 0.3}
+                strokeWidth={isHov ? 0.8 : 0.3}
                 strokeLinejoin="round"
                 style={{ cursor: cData ? "pointer" : "default", transition: "fill 0.12s" }}
                 onMouseEnter={() => { setHovered(id); setHoveredCountry(cData || null); }}
@@ -244,7 +218,7 @@ export default function Home() {
         )}
       </section>
 
-      {/* ── HOW IT WORKS ── */}
+      {/* HOW IT WORKS */}
       <section id="how" style={{
         maxWidth: 900, margin: "0 auto", padding: "60px 24px 80px", scrollMarginTop: 80,
       }}>
@@ -257,18 +231,17 @@ export default function Home() {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
           {[
-            { n: "01", icon: "\u{1F3F4}", title: "Claim a Nation", desc: "Choose an unclaimed country. Deploy its national token on pump.fun with the supplied info (name, ticker, image). Submit the token address to claim it. You become President." },
-            { n: "02", icon: "\u{1F465}", title: "Build Population", desc: "Your nation's population is the token's total holder count. More holders = bigger army. Rally your community on X to grow your nation." },
-            { n: "03", icon: "\u{1F4B0}", title: "Grow Your GDP", desc: "Your GDP is your token's market cap. Higher market cap = more powerful economy. Fund your war chest." },
-            { n: "04", icon: "\u{2694}\u{FE0F}", title: "Declare War", desc: "Attack other nations to steal their oil reserves. Wars are decided by army size (holders) vs theirs. Bigger population wins. Loser's oil transfers to winner." },
-            { n: "05", icon: "\u{1F3C6}", title: "Dominate", desc: "Climb the leaderboard. Control the global oil supply. The nation with the most oil at the end of each epoch wins rewards." },
+            { n: "01", title: "Claim a Nation", desc: "Choose an unclaimed country. Deploy its national token on pump.fun with the supplied info (name, ticker, image). Submit the token address to claim it. You become President." },
+            { n: "02", title: "Build Population", desc: "Your nation\u2019s population is the token\u2019s total holder count. More holders = bigger army. Rally your community on X to grow your nation." },
+            { n: "03", title: "Grow Your GDP", desc: "Your GDP is your token\u2019s market cap. Higher market cap = more powerful economy. Fund your war chest." },
+            { n: "04", title: "Declare War", desc: "Attack other nations to steal their oil reserves. Wars are decided by army size (holders) vs theirs. Bigger population wins. Loser\u2019s oil transfers to winner." },
+            { n: "05", title: "Dominate", desc: "Climb the leaderboard. Control the global oil supply. The nation with the most oil at the end of each epoch wins rewards." },
           ].map(s => (
             <div key={s.n} style={{
               background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
               borderRadius: 10, padding: 20,
             }}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>{s.icon}</div>
-              <span style={{ fontSize: 10, fontWeight: 800, color: "#D4A017", display: "block", marginBottom: 4 }}>STEP {s.n}</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: "#D4A017", display: "block", marginBottom: 6 }}>STEP {s.n}</span>
               <p style={{ fontSize: 13, fontWeight: 700, color: "#E8E0D0", margin: "0 0 6px" }}>{s.title}</p>
               <p style={{ fontSize: 12, color: "#666", lineHeight: 1.6, margin: 0 }}>{s.desc}</p>
             </div>
@@ -276,7 +249,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
       <footer style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "20px", textAlign: "center" }}>
         <p style={{ fontSize: 11, color: "#444" }}>OILD.fun -- The on-chain oil war. Built on Solana.</p>
       </footer>
