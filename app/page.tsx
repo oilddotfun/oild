@@ -6,6 +6,9 @@ import { feature } from "topojson-client";
 import type { Topology, GeometryCollection } from "topojson-specification";
 import { geoNaturalEarth1, geoPath, geoMercator, geoCentroid } from "d3-geo";
 import type { GeoPermissibleObjects } from "d3-geo";
+import WarPanel from "@/components/WarPanel";
+import type { War } from "@/components/WarPanel";
+import DeclareWar from "@/components/DeclareWar";
 
 /* ══════════════ TYPES ══════════════ */
 
@@ -81,7 +84,7 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
 /* ══════════════ COUNTRY POPUP (on-map) ══════════════ */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CountryPopup({ country, feat, allCountries, onClose }: { country: CountryData; feat: any; allCountries: CountryData[]; onClose: () => void }) {
+function CountryPopup({ country, feat, allCountries, onClose, onDeclareWar }: { country: CountryData; feat: any; allCountries: CountryData[]; onClose: () => void; onDeclareWar?: (defenderCode: string, defenderName: string) => void }) {
   // Generate silhouette using d3-geo
   const silhouettePath = useMemo(() => {
     const proj = geoMercator().fitExtent([[4, 4], [96, 96]], feat as GeoPermissibleObjects);
@@ -208,12 +211,12 @@ function CountryPopup({ country, feat, allCountries, onClose }: { country: Count
                 textDecoration: "none", marginBottom: 8,
               }}>View Nation</Link>
 
-              <Link href={`/country/${country.code}`} style={{
+              <button onClick={() => onDeclareWar?.(country.code, country.name)} style={{
                 display: "block", width: "100%", padding: "14px", borderRadius: 10,
-                border: "1px solid #ccc", background: "transparent",
-                color: "#1A1A1A", fontSize: 13, fontWeight: 700, textAlign: "center",
-                textDecoration: "none",
-              }}>Declare War</Link>
+                border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.06)",
+                color: "#EF4444", fontSize: 13, fontWeight: 700, textAlign: "center",
+                cursor: "pointer",
+              }}>Declare War</button>
             </>
           )}
         </div>
@@ -241,6 +244,8 @@ export default function Home() {
   const [hovered, setHovered] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedCountry, setSelectedCountry] = useState<{ data: CountryData; feat: any } | null>(null);
+  const [activeWars, setActiveWars] = useState<War[]>([]);
+  const [declareWarTarget, setDeclareWarTarget] = useState<{ attacker: string; defender: string; defenderName: string } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -264,6 +269,16 @@ export default function Home() {
   }, []);
 
   const countryByNum = new Map(countries.map(c => [c.numCode, c]));
+
+  // Countries currently at war (for map pulsing)
+  const atWarCodes = useMemo(() => {
+    const codes = new Set<string>();
+    for (const w of activeWars) {
+      codes.add(w.attackerCode);
+      codes.add(w.defenderCode);
+    }
+    return codes;
+  }, [activeWars]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -293,6 +308,20 @@ export default function Home() {
 
       {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
 
+      {/* Declare War modal */}
+      {declareWarTarget && (
+        <DeclareWar
+          attackerCode={declareWarTarget.attacker}
+          defenderCode={declareWarTarget.defender}
+          defenderName={declareWarTarget.defenderName}
+          onSuccess={() => {
+            setDeclareWarTarget(null);
+            setSelectedCountry(null);
+          }}
+          onClose={() => setDeclareWarTarget(null)}
+        />
+      )}
+
       {/* Country popup */}
       {selectedCountry && (
         <CountryPopup
@@ -300,6 +329,13 @@ export default function Home() {
           feat={selectedCountry.feat}
           allCountries={countries}
           onClose={() => setSelectedCountry(null)}
+          onDeclareWar={(defCode, defName) => {
+            // Need the user to pick their attacking nation — for now use a prompt
+            const attackerCode = prompt("Enter YOUR nation's country code (e.g. US, SA, AU):");
+            if (attackerCode) {
+              setDeclareWarTarget({ attacker: attackerCode.toUpperCase(), defender: defCode, defenderName: defName });
+            }
+          }}
         />
       )}
 
@@ -317,6 +353,7 @@ export default function Home() {
         </Link>
         <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
         <Link href="/how" style={{ fontSize: 12, color: "#888", textDecoration: "none", fontWeight: 500 }}>How it Works</Link>
+        <WarPanel onActiveWarsChange={setActiveWars} />
         <Link href="/leaderboard" style={{
           padding: "7px 18px", borderRadius: 999, border: "none", display: "inline-block",
           background: "#D4A017", color: "#0A0A0A", fontSize: 11, fontWeight: 700, cursor: "pointer",
@@ -352,9 +389,11 @@ export default function Home() {
             const d = pathGenerator(f as GeoPermissibleObjects) || "";
             if (!d) return null;
 
+            const isAtWar = cData ? atWarCodes.has(cData.code) : false;
             let fill = "#3D3A33";
             if (cData) fill = isClaimed ? "#F59E0B" : "#E8943A";
-            if (isHov) fill = isClaimed ? "#FBBF24" : "#F0A94E";
+            if (isAtWar) fill = "#EF4444";
+            if (isHov) fill = isAtWar ? "#FF6B6B" : isClaimed ? "#FBBF24" : "#F0A94E";
 
             return (
               <path
@@ -364,7 +403,11 @@ export default function Home() {
                 stroke="#0A0A0A"
                 strokeWidth={isHov ? 1.2 : 0.5}
                 strokeLinejoin="round"
-                style={{ cursor: cData ? "pointer" : "default", transition: "fill 0.12s" }}
+                style={{
+                  cursor: cData ? "pointer" : "default",
+                  transition: "fill 0.12s",
+                  animation: isAtWar ? "pulse 1.5s ease-in-out infinite" : "none",
+                }}
                 onMouseEnter={() => setHovered(id)}
                 onMouseLeave={() => setHovered(null)}
                 onClick={() => {
