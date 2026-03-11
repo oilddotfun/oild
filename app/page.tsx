@@ -145,12 +145,13 @@ export default function Home() {
         <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
         <a href="#how" style={{ fontSize: 12, color: "#888", textDecoration: "none", fontWeight: 500 }}>How it Works</a>
         <Link href="/leaderboard" style={{ fontSize: 12, color: "#888", textDecoration: "none", fontWeight: 500 }}>Leaderboard</Link>
-        <button style={{
-          padding: "7px 18px", borderRadius: 999, border: "none",
+        <Link href="/leaderboard" style={{
+          padding: "7px 18px", borderRadius: 999, border: "none", display: "inline-block",
           background: "#D4A017", color: "#0A0A0A", fontSize: 11, fontWeight: 700, cursor: "pointer",
+          textDecoration: "none",
         }}>
-          Connect Wallet
-        </button>
+          Leaderboard
+        </Link>
       </nav>
 
       {/* ── FULL-SCREEN MAP (starts at very top of page) ── */}
