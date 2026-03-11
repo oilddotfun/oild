@@ -356,31 +356,55 @@ export default function Home() {
             );
           })}
 
-          {/* Country labels */}
+          {/* Country labels — every country with data */}
           {features.map((f) => {
             const id = String(f.id);
             const cData = countryByNum.get(id);
             if (!cData) return null;
-            // Only label larger countries (oil > 500 or claimed)
-            if (cData.oil < 500 && !cData.claimed) return null;
             try {
               const centroid = projection(geoCentroid(f as GeoPermissibleObjects));
               if (!centroid) return null;
+              // Short names to prevent overflow
+              const shortNames: Record<string, string> = {
+                "United States": "USA", "United Arab Emirates": "UAE",
+                "United Kingdom": "UK", "South Korea": "S. Korea",
+                "North Korea": "N. Korea", "South Africa": "S. Africa",
+                "South Sudan": "S. Sudan", "Saudi Arabia": "Saudi",
+                "New Zealand": "NZ", "Papua New Guinea": "PNG",
+                "Dominican Republic": "DR", "Central African Republic": "CAR",
+                "Equatorial Guinea": "Eq. Guinea", "Trinidad and Tobago": "T&T",
+                "Czech Republic": "Czechia", "North Macedonia": "N. Mac.",
+                "Bosnia": "BiH", "Guinea-Bissau": "G-Bis.",
+                "Burkina Faso": "B. Faso", "Ivory Coast": "C. d'Iv.",
+                "DR Congo": "DRC", "El Salvador": "El Salv.",
+                "Sri Lanka": "Sri L.", "Bangladesh": "Bangla.",
+                "Philippines": "Philip.", "Turkmenistan": "Turkm.",
+                "Uzbekistan": "Uzbek.", "Afghanistan": "Afghan.",
+                "Kazakhstan": "Kazakh.", "Azerbaijan": "Azerb.",
+                "Mozambique": "Mozam.", "Madagascar": "Madag.",
+                "Switzerland": "Swiss", "Netherlands": "Neth.",
+                "Costa Rica": "C. Rica", "Kyrgyzstan": "Kyrgyz.",
+                "Tajikistan": "Tajik.", "Montenegro": "Mntneg.",
+                "Sierra Leone": "S. Leone",
+              };
+              const label = shortNames[cData.name] || cData.name;
               return (
                 <text
                   key={`label-${id}`}
                   x={centroid[0]}
-                  y={centroid[1]}
+                  y={centroid[1] + 1}
                   textAnchor="middle"
+                  dominantBaseline="central"
                   style={{
-                    fontSize: cData.oil > 50000 ? 7 : 5,
-                    fill: cData.claimed ? "#FBBF24" : "#E8E0D0",
+                    fontSize: 3.2,
+                    fill: "rgba(255,255,255,0.7)",
                     fontWeight: 600,
+                    fontFamily: "Inter, system-ui, sans-serif",
                     pointerEvents: "none",
-                    textShadow: "0 0 3px #0A0A0A, 0 0 3px #0A0A0A",
+                    letterSpacing: "0.02em",
                   }}
                 >
-                  {cData.name}
+                  {label}
                 </text>
               );
             } catch {
