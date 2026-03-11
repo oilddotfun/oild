@@ -78,8 +78,18 @@ export default function Leaderboard() {
   const [sortBy, setSortBy] = useState<SortKey>("oil");
 
   useEffect(() => {
+    // Fetch countries then trigger stats refresh for claimed nations
     fetch("/api/countries").then(r => r.json()).then(d => {
       setCountries(d.countries || []);
+      // Fire off stats refresh in background
+      fetch("/api/countries/stats").then(r => r.json()).then(stats => {
+        if (stats.nations?.length > 0) {
+          // Re-fetch countries with updated stats
+          fetch("/api/countries").then(r => r.json()).then(d2 => {
+            setCountries(d2.countries || []);
+          });
+        }
+      }).catch(() => {});
     }).catch(() => {});
   }, []);
 

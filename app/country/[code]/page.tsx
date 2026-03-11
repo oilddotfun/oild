@@ -26,6 +26,16 @@ export default function CountryPage() {
       const found = (d.countries || []).find((c: CountryDetail) => c.code === code);
       setCountry(found || null);
       setLoading(false);
+
+      // If claimed, trigger stats refresh in background then reload
+      if (found?.claimed && found?.claim?.tokenAddress) {
+        fetch("/api/countries/stats").then(r => r.json()).then(() => {
+          fetch("/api/countries").then(r2 => r2.json()).then(d2 => {
+            const updated = (d2.countries || []).find((c: CountryDetail) => c.code === code);
+            if (updated) setCountry(updated);
+          });
+        }).catch(() => {});
+      }
     }).catch(() => setLoading(false));
   }, [code]);
 

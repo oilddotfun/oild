@@ -63,8 +63,8 @@ export async function getWarVolume(tokenAddress: string): Promise<number> {
 }
 
 /**
- * Get token holder count from pump.fun
- * Note: pump.fun API is limited, may need RPC call instead
+ * Get token holder count
+ * Tries: 1) Helius DAS API  2) Solana RPC getTokenLargestAccounts as proxy
  */
 export async function getTokenHolders(tokenAddress: string): Promise<number> {
   try {
@@ -82,10 +82,26 @@ export async function getTokenHolders(tokenAddress: string): Promise<number> {
         }),
       });
       const data = await res.json();
-      return data.result?.total || 0;
+      if (data.result?.total) return data.result.total;
     }
 
-    return 0;
+    // Fallback: use Solana RPC to get largest token accounts (gives top 20)
+    const rpcUrl = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+    const res = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "oild-holders",
+        method: "getTokenLargestAccounts",
+        params: [tokenAddress],
+      }),
+    });
+    const data = await res.json();
+    const accounts = data.result?.value || [];
+    // This returns top 20 holders — use the count as minimum, real count is higher
+    // But it proves the token exists and has holders
+    return accounts.filter((a: { amount: string }) => Number(a.amount) > 0).length;
   } catch {
     return 0;
   }
