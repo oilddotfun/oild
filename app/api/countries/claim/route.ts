@@ -1,10 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getCountry } from "@/lib/countries";
 import { isClaimed, setClaim } from "@/lib/store";
 
-export const dynamic = "force-dynamic";
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const { code, wallet, tokenAddress, xCommunity } = await req.json();
 
@@ -12,24 +10,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Country code and wallet required" }, { status: 400 });
     }
 
-    const country = getCountry(code);
+    const upper = code.toUpperCase();
+    const country = getCountry(upper);
     if (!country) {
       return NextResponse.json({ error: "Country not found" }, { status: 404 });
     }
 
-    if (isClaimed(code)) {
-      return NextResponse.json({ error: "This nation has already been claimed" }, { status: 409 });
+    if (isClaimed(upper)) {
+      return NextResponse.json({ error: `${country.name} is already claimed` }, { status: 409 });
     }
 
-    setClaim(code, {
+    if (!tokenAddress) {
+      return NextResponse.json({ error: "Token address required. Deploy on pump.fun first." }, { status: 400 });
+    }
+
+    // TODO: Verify token on-chain (pump.fun API)
+    // For now, trust the submission and mark as unverified until confirmed
+
+    setClaim(upper, {
       claimedBy: wallet,
-      tokenAddress: tokenAddress || "",
+      tokenAddress,
       xCommunity: xCommunity || "",
       claimedAt: Date.now(),
+      population: 0,
+      gdp: 0,
       oilStolen: 0,
+      verified: false,
     });
 
-    return NextResponse.json({ success: true, country: country.name, code: country.code });
+    return NextResponse.json({
+      success: true,
+      message: `${country.name} claimed. You are now President.`,
+      country: upper,
+      president: wallet,
+    });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
