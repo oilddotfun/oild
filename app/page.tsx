@@ -66,10 +66,103 @@ function featureToPath(f: GeoFeature): string {
   return "";
 }
 
+/* ══════════════ WELCOME MODAL ══════════════ */
+
+const TOKEN_CA = "COMING SOON";
+
+function WelcomeModal({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 300,
+      background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center",
+      padding: 20,
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16,
+        maxWidth: 420, width: "100%", overflow: "hidden",
+      }}>
+        {/* Header */}
+        <div style={{
+          position: "relative", padding: "28px 24px 20px", textAlign: "center",
+          background: "linear-gradient(180deg, rgba(212,160,23,0.15) 0%, transparent 100%)",
+        }}>
+          <img src="/logo.jpg" alt="OILD" style={{ height: 48, borderRadius: 8, marginBottom: 12 }} />
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: "#E8E0D0", margin: 0 }}>Welcome to OILD.fun!</h2>
+        </div>
+
+        <div style={{ padding: "0 24px 24px" }}>
+          <p style={{ fontSize: 13, color: "#999", lineHeight: 1.7, margin: "0 0 20px" }}>
+            Every country on the world map has its own token! Whether you want to be a token leader or invest in a country token, this is a full-scale battle for nations!
+          </p>
+
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#E8E0D0", margin: "0 0 8px" }}>Buy $OILD Token</p>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10,
+            padding: "10px 14px", marginBottom: 20,
+          }}>
+            <img src="https://cryptologos.cc/logos/solana-sol-logo.png" alt="SOL" style={{ width: 20, height: 20, borderRadius: 999 }} />
+            <span style={{ flex: 1, fontSize: 11, color: "#888", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {TOKEN_CA}
+            </span>
+            <button onClick={() => {
+              navigator.clipboard.writeText(TOKEN_CA);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }} style={{
+              background: "none", border: "none", cursor: "pointer", padding: 4, color: copied ? "#22C55E" : "#666", fontSize: 14,
+            }}>
+              {copied ? "\u2713" : "\u2398"}
+            </button>
+          </div>
+
+          <p style={{ fontSize: 13, color: "#999", lineHeight: 1.7, margin: "0 0 16px" }}>
+            By purchasing the official and primary token of the platform, $OILD, you can help more country tokens join our ecosystem and support the growth of existing ones.
+          </p>
+
+          <p style={{ fontSize: 11, color: "#666", lineHeight: 1.6, margin: "0 0 20px" }}>
+            <strong style={{ color: "#999" }}>Please note:</strong> The country tokens on this platform have no affiliation with real-world countries and are created purely for entertainment purposes. Remember, each token is created by other visitors like you, so always invest responsibly.
+          </p>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <a href="https://pump.fun" target="_blank" rel="noopener noreferrer" style={{
+              flex: 1, padding: "12px", borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.1)", background: "transparent",
+              color: "#E8E0D0", fontSize: 12, fontWeight: 700, textAlign: "center",
+              textDecoration: "none",
+            }}>$OILD</a>
+            <Link href="/leaderboard" style={{
+              flex: 1, padding: "12px", borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.1)", background: "transparent",
+              color: "#E8E0D0", fontSize: 12, fontWeight: 700, textAlign: "center",
+              textDecoration: "none",
+            }}>How to Use?</Link>
+            <button onClick={onClose} style={{
+              flex: 1, padding: "12px", borderRadius: 10, border: "none",
+              background: "#D4A017", color: "#0A0A0A",
+              fontSize: 12, fontWeight: 700, cursor: "pointer",
+            }}>I Agree</button>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 16 }}>
+            <a href="https://x.com" target="_blank" rel="noopener noreferrer" style={{ color: "#555" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+            <span style={{ fontSize: 10, color: "#444" }}>Powered by Solana.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ══════════════ MAIN PAGE ══════════════ */
 
 export default function Home() {
   const [countries, setCountries] = useState<CountryData[]>([]);
+  const [showWelcome, setShowWelcome] = useState(true);
   const [features, setFeatures] = useState<GeoFeature[]>([]);
   const [hovered, setHovered] = useState<string | null>(null);
   const [hoveredCountry, setHoveredCountry] = useState<CountryData | null>(null);
@@ -106,6 +199,9 @@ export default function Home() {
 
   return (
     <div style={{ height: "100vh", background: "#0A0A0A", color: "#E8E0D0", overflow: "hidden" }}>
+
+      {/* WELCOME MODAL */}
+      {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
 
       {/* NAV — oval pill, floats over map */}
       <nav style={{
