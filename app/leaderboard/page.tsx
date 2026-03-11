@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { feature } from "topojson-client";
+import type { Topology, GeometryCollection } from "topojson-specification";
+import { geoPath, geoMercator } from "d3-geo";
+import type { GeoPermissibleObjects } from "d3-geo";
 
 interface CountryData {
   code: string; numCode: string; name: string; oil: number;
@@ -9,87 +13,57 @@ interface CountryData {
   claim: { president: string; tokenAddress: string; population: number; gdp: number; xCommunity: string } | null;
 }
 
-/* Mini silhouette for each country — fetches from TopoJSON and renders tiny SVG */
+/* ══════════════ COUNTRY SILHOUETTE ══════════════ */
+
+// Global cache for features
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let cachedFeatures: any[] | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let loadingPromise: Promise<any[]> | null = null;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function loadFeatures(): Promise<any[]> {
+  if (cachedFeatures) return Promise.resolve(cachedFeatures);
+  if (loadingPromise) return loadingPromise;
+  loadingPromise = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
+    .then(r => r.json())
+    .then((topo: Topology) => {
+      const geojson = feature(topo, topo.objects.countries as GeometryCollection);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      cachedFeatures = (geojson as any).features;
+      return cachedFeatures!;
+    });
+  return loadingPromise;
+}
+
 function CountrySilhouette({ numCode, size = 36 }: { numCode: string; size?: number }) {
-  const [path, setPath] = useState<string>("");
+  const [svgPath, setSvgPath] = useState<string>("");
 
   useEffect(() => {
-    // Cache TopoJSON globally
-    const cacheKey = "__oild_topo";
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const win = window as any;
-    const load = async () => {
-      if (!win[cacheKey]) {
-        win[cacheKey] = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json").then(r => r.json());
-      }
-      const topo = await win[cacheKey];
-      const { arcs: rawArcs, transform } = topo;
-      const { scale, translate } = transform;
+    loadFeatures().then(feats => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const feat = feats.find((f: any) => String(f.id) === numCode);
+      if (!feat) return;
 
-      const decoded: number[][][] = rawArcs.map((arc: number[][]) => {
-        let px = 0, py = 0;
-        return arc.map((d: number[]) => { px += d[0]; py += d[1]; return [px * scale[0] + translate[0], py * scale[1] + translate[1]]; });
-      });
-
-      const geom = topo.objects.countries.geometries.find((g: { id: string }) => g.id === numCode);
-      if (!geom) return;
-
-      // Decode rings
-      const allCoords: number[][] = [];
-      const decodeRing = (indices: number[]): number[][] => {
-        const coords: number[][] = [];
-        for (const idx of indices) {
-          const fwd = idx >= 0;
-          const arc = fwd ? decoded[idx] : [...decoded[~idx]].reverse();
-          if (!arc) continue;
-          for (let i = 0; i < arc.length; i++) { if (coords.length > 0 && i === 0) continue; coords.push(arc[i]); }
-        }
-        return coords;
-      };
-
-      const rings: number[][][] = [];
-      if (geom.type === "Polygon") {
-        geom.arcs.forEach((r: number[]) => { const ring = decodeRing(r); rings.push(ring); allCoords.push(...ring); });
-      } else if (geom.type === "MultiPolygon") {
-        geom.arcs.forEach((p: number[][]) => p.forEach((r: number[]) => { const ring = decodeRing(r); rings.push(ring); allCoords.push(...ring); }));
-      }
-
-      if (allCoords.length === 0) return;
-
-      // Bounding box
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      for (const [lon, lat] of allCoords) {
-        if (lon < minX) minX = lon;
-        if (lon > maxX) maxX = lon;
-        if (lat < minY) minY = lat;
-        if (lat > maxY) maxY = lat;
-      }
-      const rangeX = maxX - minX || 1;
-      const rangeY = maxY - minY || 1;
-      const s = size * 0.85;
-
-      // Generate SVG path normalized to bounding box
-      let svgPath = "";
-      for (const ring of rings) {
-        for (let i = 0; i < ring.length; i++) {
-          const x = ((ring[i][0] - minX) / rangeX) * s + (size - s) / 2;
-          const y = s - ((ring[i][1] - minY) / rangeY) * s + (size - s) / 2;
-          svgPath += i === 0 ? `M${x.toFixed(1)},${y.toFixed(1)}` : `L${x.toFixed(1)},${y.toFixed(1)}`;
-        }
-        svgPath += "Z";
-      }
-      setPath(svgPath);
-    };
-    load();
+      // Use d3-geo to compute bounds, then fit projection to our size
+      const padding = 2;
+      const proj = geoMercator().fitExtent(
+        [[padding, padding], [size - padding, size - padding]],
+        feat as GeoPermissibleObjects
+      );
+      const gen = geoPath().projection(proj);
+      const d = gen(feat as GeoPermissibleObjects);
+      if (d) setSvgPath(d);
+    });
   }, [numCode, size]);
 
-  if (!path) {
+  if (!svgPath) {
     return <div style={{ width: size, height: size, borderRadius: 6, background: "rgba(255,255,255,0.05)" }} />;
   }
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <path d={path} fill="#B8A88A" stroke="#8B7355" strokeWidth={0.5} />
+      <path d={svgPath} fill="#E8943A" stroke="#0A0A0A" strokeWidth={0.5} strokeLinejoin="round" />
     </svg>
   );
 }
