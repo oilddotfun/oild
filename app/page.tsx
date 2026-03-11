@@ -399,10 +399,10 @@ export default function Home() {
             if (!d) return null;
 
             const isAtWar = cData ? atWarCodes.has(cData.code) : false;
-            let fill = "#3D3A33";
-            if (cData) fill = isClaimed ? "#F59E0B" : "#E8943A";
-            if (isAtWar) fill = "#EF4444";
-            if (isHov) fill = isAtWar ? "#FF6B6B" : isClaimed ? "#FBBF24" : "#F0A94E";
+            let fill = "#3D3A33"; // no data
+            if (cData) fill = isClaimed ? "#22C55E" : "#E8943A"; // claimed = green, unclaimed = orange
+            if (isAtWar) fill = "#EF4444"; // at war = red
+            if (isHov) fill = isAtWar ? "#FF6B6B" : isClaimed ? "#4ADE80" : "#F0A94E";
 
             return (
               <path
