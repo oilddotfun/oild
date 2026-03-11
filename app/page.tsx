@@ -49,7 +49,14 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
           <p style={{ fontSize: 13, color: "#999", lineHeight: 1.7, margin: "0 0 20px" }}>
             Every country on the world map has its own token! Whether you want to be a token leader or invest in a country token, this is a full-scale battle for nations!
           </p>
-          <p style={{ fontSize: 13, color: "#888", margin: "0 0 20px" }}>$OILD Token: <span style={{ color: "#D4A017" }}>coming soon...</span></p>
+          <a href="https://pump.fun/coin/3QFiUjEcdSo5ZgPHSM6tq5KQqAAZJTYBsmbR5x91pump" target="_blank" rel="noopener noreferrer" style={{
+            display: "block", padding: "12px 16px", borderRadius: 10, marginBottom: 20,
+            background: "rgba(212,160,23,0.08)", border: "1px solid rgba(212,160,23,0.2)",
+            textDecoration: "none", textAlign: "center",
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#D4A017" }}>$OILD Token</span>
+            <span style={{ display: "block", fontSize: 10, color: "#666", fontFamily: "monospace", marginTop: 4 }}>3QFiUjEc...x91pump</span>
+          </a>
           <p style={{ fontSize: 13, color: "#999", lineHeight: 1.7, margin: "0 0 16px" }}>
             By purchasing the official and primary token of the platform, $OILD, you can help more country tokens join our ecosystem and support the growth of existing ones.
           </p>
@@ -57,11 +64,11 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
             <strong style={{ color: "#999" }}>Please note:</strong> The country tokens on this platform have no affiliation with real-world countries and are created purely for entertainment purposes. Remember, each token is created by other visitors like you, so always invest responsibly.
           </p>
           <div style={{ display: "flex", gap: 8 }}>
-            <a href="https://pump.fun" target="_blank" rel="noopener noreferrer" style={{
+            <a href="https://pump.fun/coin/3QFiUjEcdSo5ZgPHSM6tq5KQqAAZJTYBsmbR5x91pump" target="_blank" rel="noopener noreferrer" style={{
               flex: 1, padding: "12px", borderRadius: 10,
-              border: "1px solid rgba(255,255,255,0.1)", background: "transparent",
-              color: "#E8E0D0", fontSize: 12, fontWeight: 700, textAlign: "center", textDecoration: "none",
-            }}>$OILD</a>
+              border: "1px solid rgba(212,160,23,0.3)", background: "rgba(212,160,23,0.08)",
+              color: "#D4A017", fontSize: 12, fontWeight: 700, textAlign: "center", textDecoration: "none",
+            }}>Buy $OILD</a>
             <Link href="/how" style={{
               flex: 1, padding: "12px", borderRadius: 10,
               border: "1px solid rgba(255,255,255,0.1)", background: "transparent",
@@ -357,6 +364,11 @@ export default function Home() {
         </Link>
         <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
         <Link href="/how" style={{ fontSize: 12, color: "#888", textDecoration: "none", fontWeight: 500 }}>How it Works</Link>
+        <a href="https://pump.fun/coin/3QFiUjEcdSo5ZgPHSM6tq5KQqAAZJTYBsmbR5x91pump" target="_blank" rel="noopener noreferrer" style={{
+          padding: "6px 14px", borderRadius: 999, border: "none", display: "inline-block",
+          background: "rgba(212,160,23,0.15)", color: "#D4A017", fontSize: 11, fontWeight: 700,
+          textDecoration: "none",
+        }}>Buy $OILD</a>
         <WarPanel onActiveWarsChange={setActiveWars} />
         <a href="https://x.com/Oilddotfun" target="_blank" rel="noopener noreferrer" style={{
           display: "flex", alignItems: "center", color: "#888", transition: "color 0.15s",
