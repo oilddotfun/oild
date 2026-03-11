@@ -56,7 +56,7 @@ function WelcomeModal({ onClose }: { onClose: () => void }) {
               border: "1px solid rgba(255,255,255,0.1)", background: "transparent",
               color: "#E8E0D0", fontSize: 12, fontWeight: 700, textAlign: "center", textDecoration: "none",
             }}>$OILD</a>
-            <Link href="/leaderboard" style={{
+            <Link href="/how" style={{
               flex: 1, padding: "12px", borderRadius: 10,
               border: "1px solid rgba(255,255,255,0.1)", background: "transparent",
               color: "#E8E0D0", fontSize: 12, fontWeight: 700, textAlign: "center", textDecoration: "none",
@@ -289,7 +289,7 @@ export default function Home() {
           <img src="/logo.jpg" alt="OILD" style={{ height: 28, borderRadius: 4 }} />
         </Link>
         <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
-        <a href="#how" style={{ fontSize: 12, color: "#888", textDecoration: "none", fontWeight: 500 }}>How it Works</a>
+        <Link href="/how" style={{ fontSize: 12, color: "#888", textDecoration: "none", fontWeight: 500 }}>How it Works</Link>
         <Link href="/leaderboard" style={{
           padding: "7px 18px", borderRadius: 999, border: "none", display: "inline-block",
           background: "#D4A017", color: "#0A0A0A", fontSize: 11, fontWeight: 700, cursor: "pointer",
