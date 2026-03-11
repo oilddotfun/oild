@@ -9,8 +9,11 @@ export const metadata: Metadata = {
   description: "The on-chain oil war. Claim countries, deploy tokens on pump.fun, build armies, declare war. Every nation has a president. Built on Solana.",
   metadataBase: new URL("https://oild.fun"),
   icons: {
-    icon: "/logo.jpg",
-    apple: "/logo.jpg",
+    icon: [
+      { url: "/icon.png", sizes: "192x192", type: "image/png" },
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
   },
   openGraph: {
     title: "OILD.fun | The On-Chain Oil War",
